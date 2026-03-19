@@ -48,8 +48,7 @@ public partial class DebugGUI : MonoBehaviour
     /// <param name="color">The graph's color</param>
     public static void SetGraphProperties(object key, string label, float min, float max, int group, Color color, bool autoScale)
     {
-        if (Settings.enableGraphs)
-            Instance.graphWindow.SetGraphProperties(key, label, min, max, group, color, autoScale);
+        Instance.graphWindow.SetGraphProperties(key, label, min, max, group, color, autoScale);
     }
 
     /// <summary>
@@ -59,8 +58,7 @@ public partial class DebugGUI : MonoBehaviour
     /// <param name="val">Value to be added</param>
     public static void Graph(object key, float val)
     {
-        if (Settings.enableGraphs)
-            Instance.graphWindow.Graph(key, val);
+        Instance.graphWindow.Graph(key, val);
     }
 
     /// <summary>
@@ -69,8 +67,7 @@ public partial class DebugGUI : MonoBehaviour
     /// <param name="key">The graph's key</param>
     public static void RemoveGraph(object key)
     {
-        if (Settings.enableGraphs)
-            Instance.graphWindow.RemoveGraph(key);
+        Instance.graphWindow.RemoveGraph(key);
     }
 
     /// <summary>
@@ -79,8 +76,7 @@ public partial class DebugGUI : MonoBehaviour
     /// <param name="key">The graph's key</param>
     public static void ClearGraph(object key)
     {
-        if (Settings.enableGraphs)
-            Instance.graphWindow.ClearGraph(key);
+        Instance.graphWindow.ClearGraph(key);
     }
 
     /// <summary>
@@ -88,7 +84,7 @@ public partial class DebugGUI : MonoBehaviour
     /// </summary>
     public static string ExportGraphs()
     {
-        if (Instance == null || !Settings.enableGraphs)
+        if (Instance == null)
             return null;
 
         string dateTimeStr = DateTime.Now.ToString("yyyy-MM-ddTHH-mm-ss");
@@ -121,8 +117,7 @@ public partial class DebugGUI : MonoBehaviour
     /// </summary>
     public static void LogPersistent(object key, string message)
     {
-        if (Settings.enableLogs)
-            Instance.logWindow.LogPersistent(key, message);
+        Instance.logWindow.LogPersistent(key, message);
     }
 
     /// <summary>
@@ -130,8 +125,7 @@ public partial class DebugGUI : MonoBehaviour
     /// </summary>
     public static void RemovePersistent(object key)
     {
-        if (Settings.enableLogs)
-            Instance.logWindow.RemovePersistent(key);
+        Instance.logWindow.RemovePersistent(key);
     }
 
     /// <summary>
@@ -139,8 +133,7 @@ public partial class DebugGUI : MonoBehaviour
     /// </summary>
     public static void ClearPersistent()
     {
-        if (Settings.enableLogs)
-            Instance.logWindow.ClearPersistent();
+        Instance.logWindow.ClearPersistent();
     }
 
     /// <summary>
@@ -148,8 +141,7 @@ public partial class DebugGUI : MonoBehaviour
     /// </summary>
     public static void Log(object message)
     {
-        if (Settings.enableLogs)
-            Instance.logWindow.Log(message.ToString());
+        Instance.logWindow.Log(message.ToString());
     }
 
     #endregion
@@ -174,6 +166,37 @@ public partial class DebugGUI : MonoBehaviour
             Init();
     }
 
+    /// <summary>
+    /// Show or hide the graph window at runtime.
+    /// </summary>
+    public static void SetGraphsEnabled(bool enabled)
+    {
+        if (Instance == null) return;
+        Instance._settings.enableGraphs = enabled;
+        if (Instance.graphWindow)
+            Instance.graphWindow.gameObject.SetActive(enabled);
+    }
+
+    /// <summary>
+    /// Show or hide the log window at runtime.
+    /// </summary>
+    public static void SetLogsEnabled(bool enabled)
+    {
+        if (Instance == null) return;
+        Instance._settings.enableLogs = enabled;
+        if (Instance.logWindow)
+            Instance.logWindow.gameObject.SetActive(enabled);
+    }
+
+    /// <summary>
+    /// Show or hide all DebugGUI windows at runtime.
+    /// </summary>
+    public static void SetEnabled(bool enabled)
+    {
+        SetGraphsEnabled(enabled);
+        SetLogsEnabled(enabled);
+    }
+
     void Init()
     {
         Application.quitting += () => quitting = true;
@@ -181,17 +204,15 @@ public partial class DebugGUI : MonoBehaviour
         _settings = Resources.Load<DebugGUISettings>("DebugGUISettings");
 
         DontDestroyOnLoad(gameObject);
-        if (Settings.enableGraphs)
-        {
-            graphWindow = new GameObject("Graph").AddComponent<GraphWindow>();
-            graphWindow.Init();
-            graphWindow.transform.parent = transform;
-        }
-        if (Settings.enableLogs)
-        {
-            logWindow = new GameObject("Log").AddComponent<LogWindow>();
-            logWindow.Init();
-            logWindow.transform.parent = transform;
-        }
+
+        graphWindow = new GameObject("Graph").AddComponent<GraphWindow>();
+        graphWindow.Init();
+        graphWindow.transform.parent = transform;
+        graphWindow.gameObject.SetActive(Settings.enableGraphs);
+
+        logWindow = new GameObject("Log").AddComponent<LogWindow>();
+        logWindow.Init();
+        logWindow.transform.parent = transform;
+        logWindow.gameObject.SetActive(Settings.enableLogs);
     }
 }
