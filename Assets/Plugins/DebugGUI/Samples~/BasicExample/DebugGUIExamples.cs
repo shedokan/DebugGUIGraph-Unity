@@ -1,11 +1,11 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
 public class DebugGUIExamples : MonoBehaviour
 {
     /* * * *
-    * 
+    *
     *   [DebugGUIGraph]
     *   Renders the variable in a graph on-screen. Attribute based graphs will updates every Update.
     *    Lets you optionally define:
@@ -13,19 +13,19 @@ public class DebugGUIExamples : MonoBehaviour
     *        r, g, b   - The RGB color of the graph (0~1)
     *        group     - Graphs can be grouped into the same window and overlaid
     *        autoScale - If true the graph will readjust min/max to fit the data
-    *   
+    *
     *   [DebugGUIPrint]
-    *    Draws the current variable continuously on-screen as 
+    *    Draws the current variable continuously on-screen as
     *    $"{GameObject name} {variable name}: {value}"
-    *   
+    *
     *   For more control, these features can be accessed manually.
     *    DebugGUI.SetGraphProperties(key, ...) - Set the properties of the graph with the provided key
     *    DebugGUI.Graph(key, value)            - Push a value to the graph
     *    DebugGUI.LogPersistent(key, value)    - Print a persistent log entry on screen
     *    DebugGUI.Log(value)                   - Print a temporary log entry on screen
-    *    
+    *
     *   See DebugGUI.cs for more info
-    * 
+    *
     * * * */
 
     // Disable Field Unused warning
