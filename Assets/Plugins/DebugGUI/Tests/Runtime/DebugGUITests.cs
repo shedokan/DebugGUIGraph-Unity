@@ -233,6 +233,116 @@ public class DebugGUITests
         Cleanup(path);
     }
 
+    // ── Enable / Disable ─────────────────────────────────────────────
+
+    [UnityTest]
+    public IEnumerator SetEnabled_False_HidesBothWindows()
+    {
+        DebugGUI.SetEnabled(false);
+        yield return null;
+
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+        Assert.IsNotNull(graph, "Graph GameObject should still exist");
+        Assert.IsNotNull(log, "Log GameObject should still exist");
+        Assert.IsFalse(graph.activeSelf, "Graph should be inactive");
+        Assert.IsFalse(log.activeSelf, "Log should be inactive");
+
+        // Restore
+        DebugGUI.SetEnabled(true);
+    }
+
+    [UnityTest]
+    public IEnumerator SetEnabled_True_ShowsBothWindows()
+    {
+        DebugGUI.SetEnabled(false);
+        yield return null;
+        DebugGUI.SetEnabled(true);
+        yield return null;
+
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+        Assert.IsTrue(graph.activeSelf, "Graph should be active");
+        Assert.IsTrue(log.activeSelf, "Log should be active");
+    }
+
+    [UnityTest]
+    public IEnumerator SetGraphsEnabled_TogglesIndependently()
+    {
+        DebugGUI.SetGraphsEnabled(false);
+        yield return null;
+
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+        Assert.IsFalse(graph.activeSelf, "Graph should be inactive");
+        Assert.IsTrue(log.activeSelf, "Log should remain active");
+
+        DebugGUI.SetGraphsEnabled(true);
+    }
+
+    [UnityTest]
+    public IEnumerator SetLogsEnabled_TogglesIndependently()
+    {
+        DebugGUI.SetLogsEnabled(false);
+        yield return null;
+
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+        Assert.IsTrue(graph.activeSelf, "Graph should remain active");
+        Assert.IsFalse(log.activeSelf, "Log should be inactive");
+
+        DebugGUI.SetLogsEnabled(true);
+    }
+
+    [UnityTest]
+    public IEnumerator Graph_WhileDisabled_DoesNotThrow()
+    {
+        DebugGUI.SetGraphsEnabled(false);
+        yield return null;
+
+        Assert.DoesNotThrow(() => DebugGUI.Graph(GraphKey, 1f));
+        Assert.DoesNotThrow(() => DebugGUI.SetGraphProperties(
+            GraphKey, "Test", 0f, 1f, 0, Color.red, false));
+        Assert.DoesNotThrow(() => DebugGUI.ClearGraph(GraphKey));
+        Assert.DoesNotThrow(() => DebugGUI.RemoveGraph(GraphKey));
+
+        DebugGUI.SetGraphsEnabled(true);
+    }
+
+    [UnityTest]
+    public IEnumerator Log_WhileDisabled_DoesNotThrow()
+    {
+        DebugGUI.SetLogsEnabled(false);
+        yield return null;
+
+        Assert.DoesNotThrow(() => DebugGUI.Log("test"));
+        Assert.DoesNotThrow(() => DebugGUI.LogPersistent(LogKey, "test"));
+        Assert.DoesNotThrow(() => DebugGUI.RemovePersistent(LogKey));
+        Assert.DoesNotThrow(() => DebugGUI.ClearPersistent());
+
+        DebugGUI.SetLogsEnabled(true);
+    }
+
+    [UnityTest]
+    public IEnumerator SetEnabled_RoundTrip_RestoresState()
+    {
+        // Disable, push data, re-enable — should not throw
+        DebugGUI.SetEnabled(false);
+        DebugGUI.Graph(GraphKey, 5f);
+        DebugGUI.LogPersistent(LogKey, "hidden");
+        yield return null;
+
+        DebugGUI.SetEnabled(true);
+        yield return null;
+
+        // Verify windows are back
+        Assert.IsTrue(GameObject.Find("Graph").activeSelf);
+        Assert.IsTrue(GameObject.Find("Log").activeSelf);
+
+        // Data pushed while disabled should still be queryable
+        Assert.DoesNotThrow(() => DebugGUI.Graph(GraphKey, 10f));
+    }
+
     // ── Misc ──────────────────────────────────────────────────────────
 
     [UnityTest]
