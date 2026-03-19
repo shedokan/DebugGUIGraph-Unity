@@ -222,26 +222,24 @@ namespace WeavUtils
 
                 foreach (var key in attributeKey)
                 {
-                    var val = TryGetMemberValue(key.memberInfo, node);
-                    if(val == null) continue;
+                    var rawVal = TryGetMemberValue(key.memberInfo, node);
+                    if(rawVal == null) continue;
 
-                    if (val is float fVal)
-                        graphDictionary[key].Push(fVal);
-                    else if (val is int i)
-                        graphDictionary[key].Push(i);
-                    else if (val is Vector2 vec2){
+                    if (TryConvertToFloat(rawVal, out float val))
+                        graphDictionary[key].Push(val);
+                    else if (rawVal is Vector2 vec2){
                         graphDictionary[key].Push(vec2.x);
                         // TODO: Support x and y together
                         // graphDictionary[key + "_y"].Push(vec2.y);
                     }
-                    else if (val is Vector3 vec3){
+                    else if (rawVal is Vector3 vec3){
                         graphDictionary[key].Push(vec3.x);
                         // TODO: Support x and y and z together
                         // graphDictionary[key + "_y"].Push(vec3.y);
                         // graphDictionary[key + "_z"].Push(vec3.z);
                     }
                     else
-                        Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {val.GetType()}");
+                        Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {rawVal.GetType()}");
                 }
             }
         }
@@ -515,7 +513,7 @@ namespace WeavUtils
         }
 
                         // TODO: Test tjat the tpes supported here and polling are the same
-        private bool IsSupportedType(object value) => value is float or int or Vector2 or Vector3;
+        private bool IsSupportedType(object value) => TryConvertToFloat(value, out _) || value is Vector2 or Vector3;
 
         private void CleanUpDeletedAttributes()
         {
@@ -583,6 +581,25 @@ namespace WeavUtils
             }
 
             graphLabelBoxWidth = width + graphLabelPadding * 2;
+        }
+
+        static bool TryConvertToFloat(object value, out float result)
+        {
+            switch (value)
+            {
+                case float f:   result = f; return true;
+                case int i:     result = i; return true;
+                case double d:  result = (float)d; return true;
+                case byte b:    result = b; return true;
+                case short s:   result = s; return true;
+                case long l:    result = l; return true;
+                case uint u:    result = u; return true;
+                case ushort us: result = us; return true;
+                case sbyte sb:  result = sb; return true;
+                case decimal m: result = (float)m; return true;
+                case bool bo:   result = bo ? 1f : 0f; return true;
+                default:        result = 0f; return false;
+            }
         }
 
         private class GraphContainer
