@@ -1,7 +1,9 @@
 {
     "name": "DebugGUI.Runtime",
     "rootNamespace": "DebugGUI",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
