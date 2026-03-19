@@ -1,0 +1,27 @@
+{
+  "name": "com.weavutils.debuggui",
+  "version": "1.0.0",
+  "displayName": "DebugGUI Graph",
+  "description": "Runtime graph and persistent-log overlay for Unity. Supports both the legacy Input Manager and the new Input System Package.",
+  "unity": "2021.3",
+  "documentationUrl": "https://github.com/WeavUtils/DebugGUIGraph-Unity#readme",
+  "dependencies": {},
+  "keywords": [
+    "debug",
+    "graph",
+    "overlay",
+    "logging",
+    "development"
+  ],
+  "author": {
+    "name": "WeavUtils",
+    "url": "https://github.com/WeavUtils"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Example",
+      "description": "A scene and script demonstrating graphs, persistent logs, transient logs, and JSON export.",
+      "path": "Samples~/BasicExample"
+    }
+  ]
+}
