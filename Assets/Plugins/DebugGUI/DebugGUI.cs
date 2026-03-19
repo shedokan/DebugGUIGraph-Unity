@@ -91,7 +91,7 @@ public partial class DebugGUI : MonoBehaviour
         if (Instance == null || !Settings.enableGraphs)
             return null;
 
-        string dateTimeStr = DateTime.Now.ToString("YYY-mm-ddTHH-mm-ss");
+        string dateTimeStr = DateTime.Now.ToString("yyyy-MM-ddTHH-mm-ss");
         string filename = $"debuggui_graph_export_{dateTimeStr}.json";
 
         string filePath = Path.Combine(Application.persistentDataPath, filename);
