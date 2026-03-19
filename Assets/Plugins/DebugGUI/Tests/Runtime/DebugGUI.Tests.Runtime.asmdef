@@ -1,6 +1,6 @@
 {
     "name": "DebugGUI.Tests.Runtime",
-    "rootNamespace": "WeavUtils.Tests",
+    "rootNamespace": "WeavUtils",
     "references": [
         "DebugGUI.Runtime",
         "UnityEngine.TestRunner"
