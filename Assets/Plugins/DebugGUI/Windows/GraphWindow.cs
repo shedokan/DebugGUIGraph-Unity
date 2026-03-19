@@ -236,24 +236,22 @@ namespace WeavUtils
                     {
                         graphDictionary[key].Push(val);
                     }
-                    else if (rawVal is Vector2 vec2)
-                    {
-                        graphDictionary[key].Push(vec2.x);
-                        if (key.componentKeys != null && key.componentKeys.Length >= 1)
-                            graphDictionary[key.componentKeys[0]].Push(vec2.y);
-                    }
-                    else if (rawVal is Vector3 vec3)
-                    {
-                        graphDictionary[key].Push(vec3.x);
-                        if (key.componentKeys != null && key.componentKeys.Length >= 2)
-                        {
-                            graphDictionary[key.componentKeys[0]].Push(vec3.y);
-                            graphDictionary[key.componentKeys[1]].Push(vec3.z);
-                        }
-                    }
                     else
                     {
-                        Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {rawVal.GetType()}");
+                        float[] components = GetComponents(rawVal);
+                        if (components != null)
+                        {
+                            graphDictionary[key].Push(components[0]);
+                            if (key.componentKeys != null)
+                            {
+                                for (int i = 0; i < key.componentKeys.Length && i + 1 < components.Length; i++)
+                                    graphDictionary[key.componentKeys[i]].Push(components[i + 1]);
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {rawVal.GetType()}");
+                        }
                     }
                 }
             }
@@ -471,29 +469,20 @@ namespace WeavUtils
                             key = new GraphAttributeKey(method); // Note: See prerequisites below
                         }
 
-                        // Build and configure the graph
+                        // Build and configure the graph(s)
                         Color baseColor = graphAttribute.color.Equals(default(Color))
                             ? Color.white
                             : graphAttribute.color;
 
-                        bool isVector2 = value is Vector2;
-                        bool isVector3 = value is Vector3;
-
-                        if (isVector2 || isVector3)
+                        var componentDef = GetVectorComponentDef(value);
+                        if (componentDef.HasValue)
                         {
-                            // Create component graphs for vector types
-                            string[] labels = isVector3
-                                ? new[] { ".X", ".Y", ".Z" }
-                                : new[] { ".X", ".Y" };
-                            Color[] colors = isVector3
-                                ? new[] { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 1f, 0.3f), new Color(0.3f, 0.5f, 1f) }
-                                : new[] { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 1f, 0.3f) };
+                            // Multi-component type: create one overlaid graph per component
+                            var (labels, colors) = componentDef.Value;
+                            var componentKeys = new GraphAttributeKey[labels.Length - 1];
 
-                            int componentCount = isVector3 ? 3 : 2;
-                            var componentKeys = new GraphAttributeKey[componentCount - 1];
-
-                            // X graph uses the primary key
-                            var xGraph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                            // First component uses the primary key
+                            var firstGraph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
                             {
                                 name = member.Name + labels[0],
                                 max = graphAttribute.max,
@@ -501,11 +490,11 @@ namespace WeavUtils
                                 autoScale = graphAttribute.autoScale,
                                 color = colors[0]
                             };
-                            xGraph.OnLabelSizeChange += RefreshRect;
-                            AddGraph(key, xGraph);
+                            firstGraph.OnLabelSizeChange += RefreshRect;
+                            AddGraph(key, firstGraph);
 
-                            // Y and Z graphs use component keys
-                            for (int c = 1; c < componentCount; c++)
+                            // Remaining components use their own keys, same group (overlaid)
+                            for (int c = 1; c < labels.Length; c++)
                             {
                                 var compKey = new GraphAttributeKey(member);
                                 componentKeys[c - 1] = compKey;
@@ -581,7 +570,49 @@ namespace WeavUtils
             }
         }
 
-        private bool IsSupportedType(object value) => TryConvertToFloat(value, out _) || value is Vector2 or Vector3;
+        private bool IsSupportedType(object value) =>
+            TryConvertToFloat(value, out _) || GetVectorComponentDef(value).HasValue;
+
+        // Standard axis / channel colors
+        static readonly Color ColX = new(1f, 0.3f, 0.3f);
+        static readonly Color ColY = new(0.3f, 1f, 0.3f);
+        static readonly Color ColZ = new(0.3f, 0.5f, 1f);
+        static readonly Color ColW = new(1f, 0.3f, 1f);
+
+        // Returns component labels + per-component colors for multi-component types.
+        // Components are overlaid in the same graph group for easy comparison.
+        private static (string[] labels, Color[] colors)? GetVectorComponentDef(object value)
+        {
+            return value switch
+            {
+                Vector2    => (new[] {".X", ".Y"},             new[] {ColX, ColY}),
+                Vector2Int => (new[] {".X", ".Y"},             new[] {ColX, ColY}),
+                Vector3    => (new[] {".X", ".Y", ".Z"},       new[] {ColX, ColY, ColZ}),
+                Vector3Int => (new[] {".X", ".Y", ".Z"},       new[] {ColX, ColY, ColZ}),
+                Vector4    => (new[] {".X", ".Y", ".Z", ".W"}, new[] {ColX, ColY, ColZ, ColW}),
+                Quaternion => (new[] {".X", ".Y", ".Z", ".W"}, new[] {ColX, ColY, ColZ, ColW}),
+                Color      => (new[] {".R", ".G", ".B", ".A"}, new[] {Color.red, Color.green, ColZ, Color.white}),
+                Color32    => (new[] {".R", ".G", ".B", ".A"}, new[] {Color.red, Color.green, ColZ, Color.white}),
+                _ => null
+            };
+        }
+
+        // Extracts all components as floats, in the same order as GetVectorComponentDef labels.
+        private static float[] GetComponents(object value)
+        {
+            return value switch
+            {
+                Vector2 v    => new[] {v.x, v.y},
+                Vector2Int v => new[] {(float)v.x, (float)v.y},
+                Vector3 v    => new[] {v.x, v.y, v.z},
+                Vector3Int v => new[] {(float)v.x, (float)v.y, (float)v.z},
+                Vector4 v    => new[] {v.x, v.y, v.z, v.w},
+                Quaternion v => new[] {v.x, v.y, v.z, v.w},
+                Color v      => new[] {v.r, v.g, v.b, v.a},
+                Color32 v    => new[] {v.r / 255f, v.g / 255f, v.b / 255f, v.a / 255f},
+                _ => null
+            };
+        }
 
         private void CleanUpDeletedAttributes()
         {
