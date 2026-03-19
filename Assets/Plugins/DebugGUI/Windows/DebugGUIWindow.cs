@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace WeavUtils
 {
@@ -17,11 +18,32 @@ namespace WeavUtils
 
         Vector2 lastMousePos;
 
+        // Only needed for GL line drawing (graph curves, scrubber)
         static Material drawMat;
+
+        // 1x1 white texture used for IMGUI rect drawing — works on all platforms
+        static Texture2D colorTexture;
+        static Texture2D ColorTexture
+        {
+            get
+            {
+                if (colorTexture != null) return colorTexture;
+                colorTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+                {
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                colorTexture.SetPixel(0, 0, Color.white);
+                colorTexture.Apply();
+                return colorTexture;
+            }
+        }
+
         Material CreateMaterial()
         {
-            // Unity has a built-in shader that is useful for drawing
-            // simple colored things.
+            // TODO: Use a better shader, maybe unlit? or UI?
+
+            // Hidden/Internal-Colored must be in Project Settings > Graphics > Always Included Shaders
+            // for mobile builds. Alternatively, place it in a Resources folder.
             Shader shader = Shader.Find("Hidden/Internal-Colored");
             Material mat = new Material(shader);
             mat.hideFlags = HideFlags.HideAndDontSave;
@@ -32,7 +54,6 @@ namespace WeavUtils
             mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
             // Turn off depth writes
             mat.SetInt("_ZWrite", 0);
-
             return mat;
         }
 
@@ -73,6 +94,21 @@ namespace WeavUtils
             if (Camera.current != Camera.main) return;
             RenderGLOverlay();
         }
+
+        void RenderGLOverlay()
+        {
+            if (drawMat == null) return;
+            drawMat.SetPass(0);
+            GL.PushMatrix();
+            GL.LoadPixelMatrix(0, Screen.width, Screen.height, 0); // maps GL coords to screen pixels, top-left origin
+            DrawGL();
+            GL.PopMatrix();
+        }
+
+        // Override in subclasses to perform GL drawing (lines, graph curves).
+        // The material pass and pixel matrix are already set up when this is called.
+        // Do NOT call IMGUI (GUI.*) methods here.
+        protected virtual void DrawGL() { }
 
         void Update()
         {
@@ -126,45 +162,31 @@ namespace WeavUtils
         {
             // Only draw once per frame
             if (Event.current.type != EventType.Repaint)
-            {
                 return;
-            }
-
-            drawMat.SetPass(0);
         }
 
         GUIContent tmpGuiContent = new();
         protected Vector2 GetMultilineStringSize(GUIStyle style, in string str)
         {
             tmpGuiContent.text = str;
-            style.CalcMinMaxWidth(
-                tmpGuiContent, out _, out float width
-            );
+            style.CalcMinMaxWidth(tmpGuiContent, out _, out float width);
             var height = style.CalcHeight(tmpGuiContent, width);
-
-            return new Vector2(
-                width,
-                height
-            );
+            return new Vector2(width, height);
         }
 
+        // Draws a solid color rectangle using IMGUI — works on all platforms including Android and iOS.
+        // Call this from OnGUI only.
         protected void DrawRect(Rect rect, Color color, Vector2 padding = default)
         {
             rect.position += this.rect.position;
             rect.size += padding * 2;
-
-            GL.Begin(GL.QUADS);
-            {
-                GL.Color(color);
-
-                GL.Vertex3(rect.x, rect.y, 0.0f);
-                GL.Vertex3(rect.x, rect.y + rect.height, 0.0f);
-                GL.Vertex3(rect.x + rect.width, rect.y + rect.height, 0.0f);
-                GL.Vertex3(rect.x + rect.width, rect.y, 0.0f);
-            }
-            GL.End();
+            var prevColor = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, ColorTexture);
+            GUI.color = prevColor;
         }
 
+        // Draws a line using GL. Call this from DrawGL() only.
         protected void DrawLine(Vector2 start, Vector2 end, Color color)
         {
             start += rect.position;
@@ -173,7 +195,6 @@ namespace WeavUtils
             GL.Begin(GL.LINES);
             {
                 GL.Color(color);
-
                 GL.Vertex(start);
                 GL.Vertex(end);
             }
@@ -184,6 +205,7 @@ namespace WeavUtils
         {
             DrawLabel(new Rect(pos, GetMultilineStringSize(GUIStyle.none, in label)), label, padding, style);
         }
+
         protected void DrawLabel(Rect rect, string label, Vector2 padding = default, GUIStyle style = null)
         {
             rect.position += this.rect.position;

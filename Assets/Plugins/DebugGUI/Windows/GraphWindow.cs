@@ -61,6 +61,16 @@ namespace WeavUtils
             }
         }
 
+        protected override void DrawGL()
+        {
+            int groupNum = 0;
+            foreach (var group in graphGroups.Values)
+            {
+                DrawGraphGroupGL(group, groupNum);
+                groupNum++;
+            }
+        }
+
         protected override void OnGUI()
         {
             if(!IsInitialized) return;
@@ -79,13 +89,6 @@ namespace WeavUtils
                 DrawGraphGroup(group, groupNum);
                 groupNum++;
             }
-
-            foreach (var label in deferredLabels)
-            {
-                graphLabelStyle.normal.textColor = label.color;
-                DrawLabel(label.position, label.label, style: graphLabelStyle);
-            }
-            deferredLabels.Clear();
         }
 
         public void Graph(object key, float val)
@@ -98,7 +101,7 @@ namespace WeavUtils
             if (freezeGraphs) return;
 
             graphDictionary[key].Push(val);
-            // Todo: optimize away?
+            // TODO: optimize away?
             RecalculateGraphLabelWidth();
         }
 
@@ -244,37 +247,48 @@ namespace WeavUtils
         }
 
         GraphContainer lastPressedGraphLabel;
-        private void DrawGraphGroup(List<GraphContainer> group, int groupNum)
+
+        static Vector2 GetRelativeMousePos(Rect windowRect)
         {
-            Vector2 relativeMousePos = DebugGUIInput.MousePosition;
-            relativeMousePos.y = Screen.height - relativeMousePos.y;
-            relativeMousePos -= rect.position;
+            Vector2 mousePos = DebugGUIInput.MousePosition;
+            mousePos.y = Screen.height - mousePos.y;
+            return mousePos - windowRect.position;
+        }
 
-            Vector2 graphBlockSize = new Vector2(Settings.graphWidth + graphBlockPadding, Settings.graphHeight + graphBlockPadding);
-
-            var groupOrigin = new Vector2(0, graphBlockSize.y * groupNum);
-            var groupGraphRect = new Rect(
+        static Rect GetGroupGraphRect(Vector2 groupOrigin, float graphLabelBoxWidth)
+        {
+            return new Rect(
                 groupOrigin.x + graphLabelBoxWidth + graphBlockPadding,
                 groupOrigin.y,
                 Settings.graphWidth,
                 Settings.graphHeight
             );
+        }
+
+        // IMGUI pass: backgrounds, hover/button logic, labels. No GL calls.
+        private void DrawGraphGroup(List<GraphContainer> group, int groupNum)
+        {
+            Vector2 relativeMousePos = GetRelativeMousePos(rect);
+            Vector2 graphBlockSize = new Vector2(Settings.graphWidth + graphBlockPadding,
+                Settings.graphHeight + graphBlockPadding);
+            var groupOrigin = new Vector2(0, graphBlockSize.y * groupNum);
+            var groupGraphRect = GetGroupGraphRect(groupOrigin, graphLabelBoxWidth);
 
             // Label background
             DrawRect(new Rect(
-                groupOrigin.x,
-                groupOrigin.y,
-                graphLabelBoxWidth,
-                Settings.graphHeight),
-            Settings.backgroundColor);
+                    groupOrigin.x,
+                    groupOrigin.y,
+                    graphLabelBoxWidth,
+                    Settings.graphHeight),
+                Settings.backgroundColor);
 
             // Graph background
             DrawRect(new Rect(
-                groupOrigin.x + graphBlockPadding + graphLabelBoxWidth,
-                groupOrigin.y,
-                graphBlockSize.x,
-                Settings.graphHeight),
-            Settings.backgroundColor);
+                    groupOrigin.x + graphBlockPadding + graphLabelBoxWidth,
+                    groupOrigin.y,
+                    graphBlockSize.x,
+                    Settings.graphHeight),
+                Settings.backgroundColor);
 
             // Magic padding offsets
             Vector2 textOrigin = groupOrigin + new Vector2(0, 14);
@@ -290,50 +304,71 @@ namespace WeavUtils
                 minMaxOrigin += Vector2.left * (maxWidthOfMinMaxStrings + graphLabelPadding);
 
                 // Label button logic
-                var labelRect = new Rect(textOrigin - textSize + new Vector2(graphLabelBoxWidth - (graphLabelPadding * 2), graphLabelPadding), textSize);
-                // Enable disable
+                var labelRect =
+                    new Rect(
+                        textOrigin - textSize + new Vector2(graphLabelBoxWidth - (graphLabelPadding * 2),
+                            graphLabelPadding), textSize);
                 var isHovered = labelRect.Contains(relativeMousePos);
                 var isPressed = isHovered && DebugGUIInput.LeftMouseButtonPressed;
 
                 // Button click
                 if (lastPressedGraphLabel == graph && !isPressed && isHovered)
-                {
                     graph.visible = !graph.visible;
-                }
 
                 if (isPressed)
-                {
                     lastPressedGraphLabel = graph;
-                }
                 else if (lastPressedGraphLabel == graph)
-                {
                     lastPressedGraphLabel = null;
-                }
 
                 var graphColor = graph.GetModifiedColor(isHovered);
+                graphLabelStyle.normal.textColor = graphColor;
 
-                // Name
-                DrawLabelDeferred(
-                    labelRect.position,
-                    graph.name,
-                    graphColor
-                );
+                DrawLabel(labelRect.position, graph.name, style: graphLabelStyle);
+                DrawLabel(minMaxOrigin, graph.maxString, style: graphLabelStyle);
+                DrawLabel(minMaxOrigin + new Vector2(0, Settings.graphHeight - 20), graph.minString,
+                    style: graphLabelStyle);
+            }
 
-                // Max
-                DrawLabelDeferred(
-                    minMaxOrigin,
-                    graph.maxString,
-                    graphColor
-                );
+            // Scrubber
+            if (groupGraphRect.Contains(relativeMousePos))
+            {
+                if (DebugGUIInput.LeftMouseButtonPressed)
+                    freezeGraphs = true;
 
-                // Min
-                DrawLabelDeferred(
-                    minMaxOrigin + new Vector2(0, Settings.graphHeight - 20),
-                    graph.minString,
-                    graphColor
-                );
+                // Background
+                Vector2 scrubberOrigin = new Vector2(relativeMousePos.x, groupOrigin.y);
+                if (relativeMousePos.x > groupGraphRect.max.x - scrubberBackgroundWidth)
+                    scrubberOrigin.x -= scrubberBackgroundWidth;
 
-                // Graph
+                DrawRect(
+                    new Rect(scrubberOrigin.x, scrubberOrigin.y, scrubberBackgroundWidth, Settings.graphHeight),
+                    Settings.backgroundColor);
+
+                // Scrubber labels
+                Vector2 textPos = scrubberOrigin + new Vector2(graphLabelPadding, graphLabelPadding * 3);
+                int sampleIndex = (int)(groupGraphRect.width - (relativeMousePos.x - groupOrigin.x) +
+                                        graphLabelBoxWidth + graphBlockPadding);
+                foreach (GraphContainer graph in group)
+                {
+                    graphLabelStyle.normal.textColor = graph.color;
+                    DrawLabel(textPos, graph.GetValue(sampleIndex).ToString("F3"), style: graphLabelStyle);
+                    textPos.y += cachedLineHeight;
+                }
+            }
+        }
+
+        // GL pass: graph curves and scrubber line. No IMGUI calls.
+        // Called from DrawGL() which has already set up the material and pixel matrix.
+        private void DrawGraphGroupGL(List<GraphContainer> group, int groupNum)
+        {
+            Vector2 relativeMousePos = GetRelativeMousePos(rect);
+            Vector2 graphBlockSize = new Vector2(Settings.graphWidth + graphBlockPadding,
+                Settings.graphHeight + graphBlockPadding);
+            var groupOrigin = new Vector2(0, graphBlockSize.y * groupNum);
+            var groupGraphRect = GetGroupGraphRect(groupOrigin, graphLabelBoxWidth);
+
+            foreach (var graph in group)
+            {
                 if (graph.visible)
                 {
                     graph.Draw(new Rect(
@@ -343,55 +378,13 @@ namespace WeavUtils
                 }
             }
 
-            // Scrubber
             if (groupGraphRect.Contains(relativeMousePos))
             {
-                if (DebugGUIInput.LeftMouseButtonPressed)
-                {
-                    freezeGraphs = true;
-                }
-
-                // Background
-                Vector2 scrubberOrigin = new Vector2(relativeMousePos.x, groupOrigin.y);
-                if (relativeMousePos.x > groupGraphRect.max.x - scrubberBackgroundWidth)
-                {
-                    scrubberOrigin.x -= scrubberBackgroundWidth;
-                }
-
-                var rect = new Rect(
-                    scrubberOrigin.x,
-                    scrubberOrigin.y,
-                    scrubberBackgroundWidth,
-                    Settings.graphHeight
-                );
-                DrawRect(rect, Settings.backgroundColor);
-
                 DrawLine(
-                    new Vector2(
-                        relativeMousePos.x,
-                        groupOrigin.y
-                    ), new Vector2(
-                        relativeMousePos.x,
-                        groupOrigin.y + Settings.graphHeight
-                    ),
+                    new Vector2(relativeMousePos.x, groupOrigin.y),
+                    new Vector2(relativeMousePos.x, groupOrigin.y + Settings.graphHeight),
                     Settings.scrubberColor
                 );
-
-                // Scrubber labels
-                Vector2 textPos = scrubberOrigin + new Vector2(graphLabelPadding, graphLabelPadding * 3);
-                var groupMousePosX = (relativeMousePos.x - groupOrigin.x);
-                int sampleIndex = (int)(groupGraphRect.width - groupMousePosX + graphLabelBoxWidth + graphBlockPadding);
-                foreach (GraphContainer graph in group)
-                {
-                    var text = graph.GetValue(sampleIndex).ToString("F3");
-                    DrawLabelDeferred(
-                        textPos,
-                        text,
-                        color: graph.color
-                    );
-
-                    textPos.y += cachedLineHeight;
-                }
             }
         }
 
@@ -590,21 +583,6 @@ namespace WeavUtils
             }
 
             graphLabelBoxWidth = width + graphLabelPadding * 2;
-        }
-
-        // GUI calls will break later GL calls, so we defer the label drawing
-
-        List<DeferredLabel> deferredLabels = new();
-        struct DeferredLabel
-        {
-            public Vector2 position;
-            public string label;
-            public Color color;
-        }
-
-        void DrawLabelDeferred(Vector2 pos, string label, Color color)
-        {
-            deferredLabels.Add(new DeferredLabel() { position = pos, label = label, color = color });
         }
 
         private class GraphContainer
