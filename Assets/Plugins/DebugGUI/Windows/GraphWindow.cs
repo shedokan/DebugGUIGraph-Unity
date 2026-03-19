@@ -158,7 +158,7 @@ namespace WeavUtils
 
         public void ReinitializeAttributes()
         {
-            // Clean up graphs
+            // Clean up graphs (including vector component keys)
             List<object> toRemove = new List<object>();
             foreach (var key in graphDictionary.Keys)
             {
@@ -230,23 +230,31 @@ namespace WeavUtils
                 foreach (var key in attributeKey)
                 {
                     var rawVal = TryGetMemberValue(key.memberInfo, node);
-                    if(rawVal == null) continue;
+                    if (rawVal == null) continue;
 
                     if (TryConvertToFloat(rawVal, out float val))
+                    {
                         graphDictionary[key].Push(val);
-                    else if (rawVal is Vector2 vec2){
-                        graphDictionary[key].Push(vec2.x);
-                        // TODO: Support x and y together
-                        // graphDictionary[key + "_y"].Push(vec2.y);
                     }
-                    else if (rawVal is Vector3 vec3){
+                    else if (rawVal is Vector2 vec2)
+                    {
+                        graphDictionary[key].Push(vec2.x);
+                        if (key.componentKeys != null && key.componentKeys.Length >= 1)
+                            graphDictionary[key.componentKeys[0]].Push(vec2.y);
+                    }
+                    else if (rawVal is Vector3 vec3)
+                    {
                         graphDictionary[key].Push(vec3.x);
-                        // TODO: Support x and y and z together
-                        // graphDictionary[key + "_y"].Push(vec3.y);
-                        // graphDictionary[key + "_z"].Push(vec3.z);
+                        if (key.componentKeys != null && key.componentKeys.Length >= 2)
+                        {
+                            graphDictionary[key.componentKeys[0]].Push(vec3.y);
+                            graphDictionary[key.componentKeys[1]].Push(vec3.z);
+                        }
                     }
                     else
+                    {
                         Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {rawVal.GetType()}");
+                    }
                 }
             }
         }
@@ -439,7 +447,7 @@ namespace WeavUtils
                         var value = TryGetMemberValue(member, mb);
                         if (!IsSupportedType(value))
                         {
-                            Debug.LogError($"Type {value.GetType()} returned by {mbType.Name}.{member.Name} is not supported supported (or method requires parameters). This member will be ignored.");
+                            Debug.LogError($"Type {value.GetType()} returned by {mbType.Name}.{member.Name} is not supported (or method requires parameters). This member will be ignored.");
                             continue;
                         }
 
@@ -464,24 +472,76 @@ namespace WeavUtils
                         }
 
                         // Build and configure the graph
-                        GraphContainer graph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                        Color baseColor = graphAttribute.color.Equals(default(Color))
+                            ? Color.white
+                            : graphAttribute.color;
+
+                        bool isVector2 = value is Vector2;
+                        bool isVector3 = value is Vector3;
+
+                        if (isVector2 || isVector3)
                         {
-                            name = member.Name,
-                            max = graphAttribute.max,
-                            min = graphAttribute.min,
-                            autoScale = graphAttribute.autoScale
-                        };
-                        graph.OnLabelSizeChange += RefreshRect;
-                        
-                        if (!graphAttribute.color.Equals(default(Color)))
-                            graph.color = graphAttribute.color;
+                            // Create component graphs for vector types
+                            string[] labels = isVector3
+                                ? new[] { ".X", ".Y", ".Z" }
+                                : new[] { ".X", ".Y" };
+                            Color[] colors = isVector3
+                                ? new[] { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 1f, 0.3f), new Color(0.3f, 0.5f, 1f) }
+                                : new[] { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 1f, 0.3f) };
+
+                            int componentCount = isVector3 ? 3 : 2;
+                            var componentKeys = new GraphAttributeKey[componentCount - 1];
+
+                            // X graph uses the primary key
+                            var xGraph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                            {
+                                name = member.Name + labels[0],
+                                max = graphAttribute.max,
+                                min = graphAttribute.min,
+                                autoScale = graphAttribute.autoScale,
+                                color = colors[0]
+                            };
+                            xGraph.OnLabelSizeChange += RefreshRect;
+                            AddGraph(key, xGraph);
+
+                            // Y and Z graphs use component keys
+                            for (int c = 1; c < componentCount; c++)
+                            {
+                                var compKey = new GraphAttributeKey(member);
+                                componentKeys[c - 1] = compKey;
+                                var compGraph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                                {
+                                    name = member.Name + labels[c],
+                                    max = graphAttribute.max,
+                                    min = graphAttribute.min,
+                                    autoScale = graphAttribute.autoScale,
+                                    color = colors[c]
+                                };
+                                compGraph.OnLabelSizeChange += RefreshRect;
+                                AddGraph(compKey, compGraph);
+                            }
+
+                            key.componentKeys = componentKeys;
+                        }
+                        else
+                        {
+                            var graph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                            {
+                                name = member.Name,
+                                max = graphAttribute.max,
+                                min = graphAttribute.min,
+                                autoScale = graphAttribute.autoScale,
+                                color = baseColor
+                            };
+                            graph.OnLabelSizeChange += RefreshRect;
+                            AddGraph(key, graph);
+                        }
 
                         // Register the key
                         if (!attributeKeys.ContainsKey(mb))
                             attributeKeys[mb] = new List<GraphAttributeKey>();
-                        
+
                         attributeKeys[mb].Add(key);
-                        AddGraph(key, graph);
                     }
                 }
 
@@ -504,10 +564,6 @@ namespace WeavUtils
         {
             try
             {
-                if(memberInfo is MethodInfo met)
-                {
-                    Debug.Log($"{memberInfo}.{memberInfo.Name}: {met.GetParameters()}");
-                }
                 return memberInfo switch
                 {
                     FieldInfo f => f.GetValue(instance),
@@ -525,7 +581,6 @@ namespace WeavUtils
             }
         }
 
-                        // TODO: Test tjat the tpes supported here and polling are the same
         private bool IsSupportedType(object value) => TryConvertToFloat(value, out _) || value is Vector2 or Vector3;
 
         private void CleanUpDeletedAttributes()
@@ -540,6 +595,11 @@ namespace WeavUtils
                     foreach (var key in keys)
                     {
                         RemoveGraph(key);
+                        if (key.componentKeys != null)
+                        {
+                            foreach (var compKey in key.componentKeys)
+                                RemoveGraph(compKey);
+                        }
                     }
 
                     attributeKeys.Remove(mb);
@@ -770,6 +830,9 @@ namespace WeavUtils
         public class GraphAttributeKey
         {
             public MemberInfo memberInfo;
+            // For Vector2/Vector3: keys for the Y (and Z) component graphs
+            public GraphAttributeKey[] componentKeys;
+
             public GraphAttributeKey(MemberInfo memberInfo)
             {
                 this.memberInfo = memberInfo;
