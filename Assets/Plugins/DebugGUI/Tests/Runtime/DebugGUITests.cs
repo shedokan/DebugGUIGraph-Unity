@@ -238,13 +238,15 @@ public class DebugGUITests
     [UnityTest]
     public IEnumerator SetEnabled_False_HidesBothWindows()
     {
-        DebugGUI.SetEnabled(false);
-        yield return null;
-
+        // Grab references while both are still active — Find only returns active objects
         var graph = GameObject.Find("Graph");
         var log = GameObject.Find("Log");
         Assert.IsNotNull(graph, "Graph GameObject should still exist");
         Assert.IsNotNull(log, "Log GameObject should still exist");
+
+        DebugGUI.SetEnabled(false);
+        yield return null;
+
         Assert.IsFalse(graph.activeSelf, "Graph should be inactive");
         Assert.IsFalse(log.activeSelf, "Log should be inactive");
 
@@ -269,11 +271,13 @@ public class DebugGUITests
     [UnityTest]
     public IEnumerator SetGraphsEnabled_TogglesIndependently()
     {
+        // Grab references while both are active
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+
         DebugGUI.SetGraphsEnabled(false);
         yield return null;
 
-        var graph = GameObject.Find("Graph");
-        var log = GameObject.Find("Log");
         Assert.IsFalse(graph.activeSelf, "Graph should be inactive");
         Assert.IsTrue(log.activeSelf, "Log should remain active");
 
@@ -283,11 +287,13 @@ public class DebugGUITests
     [UnityTest]
     public IEnumerator SetLogsEnabled_TogglesIndependently()
     {
+        // Grab references while both are active
+        var graph = GameObject.Find("Graph");
+        var log = GameObject.Find("Log");
+
         DebugGUI.SetLogsEnabled(false);
         yield return null;
 
-        var graph = GameObject.Find("Graph");
-        var log = GameObject.Find("Log");
         Assert.IsTrue(graph.activeSelf, "Graph should remain active");
         Assert.IsFalse(log.activeSelf, "Log should be inactive");
 
