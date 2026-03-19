@@ -27,6 +27,9 @@ namespace WeavUtils
             RegisterAttributes();
             textStyle = new GUIStyle();
             textStyle.normal.textColor = Color.white;
+            
+            var windowSize = GetDraggableRect().size;
+            rect.position = CalculateInitialPosition(DebugGUI.Settings.logInitialCorner, DebugGUI.Settings.logInitialOffset, windowSize);
         }
 
         void LateUpdate()

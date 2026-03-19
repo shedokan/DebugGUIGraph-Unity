@@ -6,8 +6,14 @@ namespace WeavUtils
     // Draggable window clamped to the corners
     public class DebugGUIWindow : MonoBehaviour
     {
-        protected const int outOfScreenClampPadding = 30;
-        protected readonly Vector2 Padding = new Vector2(5, 5);
+        private static DebugGUISettings Settings => DebugGUI.Settings;
+        
+        protected const int outOfScreenClampPaddingBase = 30;
+        protected readonly Vector2 PaddingBase = new(5, 5);
+
+        protected int outOfScreenClampPadding => Mathf.RoundToInt(outOfScreenClampPaddingBase * Settings.EffectiveScale);
+        protected Vector2 Padding => PaddingBase * Settings.EffectiveScale;
+
 
         static bool dragInProgress;
         bool dragged;
@@ -211,6 +217,19 @@ namespace WeavUtils
             rect.position += this.rect.position;
             tmpGuiContent.text = label;
             GUI.Label(new Rect(rect.position + padding, rect.size + padding), tmpGuiContent, style ?? GUIStyle.none);
+        }
+        
+
+        protected static Vector2 CalculateInitialPosition(ScreenCorner corner, Vector2 offset, Vector2 windowSize)
+        {
+            return corner switch
+            {
+                ScreenCorner.TopLeft     => offset,
+                ScreenCorner.TopRight    => new Vector2(Screen.width - windowSize.x - offset.x, offset.y),
+                ScreenCorner.BottomLeft  => new Vector2(offset.x, Screen.height - windowSize.y - offset.y),
+                ScreenCorner.BottomRight => new Vector2(Screen.width - windowSize.x - offset.x, Screen.height - windowSize.y - offset.y),
+                _ => offset
+            };
         }
     }
 }

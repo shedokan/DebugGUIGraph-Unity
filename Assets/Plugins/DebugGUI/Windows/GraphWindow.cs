@@ -10,10 +10,15 @@ namespace WeavUtils
 {
     public class GraphWindow : DebugGUIWindow
     {
-        const int graphLabelFontSize = 12;
-        const int graphLabelPadding = 5;
-        const int graphBlockPadding = 3;
-        const int scrubberBackgroundWidth = 55;
+        const int graphLabelFontSizeBase = 12;
+        const int graphLabelPaddingBase = 5;
+        const int graphBlockPaddingBase = 3;
+        const int scrubberBackgroundWidthBase = 55;
+
+        static int ScaledFontSize => Mathf.RoundToInt(graphLabelFontSizeBase * Settings.EffectiveScale);
+        static int ScaledLabelPadding => Mathf.RoundToInt(graphLabelPaddingBase * Settings.EffectiveScale);
+        static int ScaledBlockPadding => Mathf.RoundToInt(graphBlockPaddingBase * Settings.EffectiveScale);
+        static int ScaledScrubberWidth => Mathf.RoundToInt(scrubberBackgroundWidthBase * Settings.EffectiveScale);
 
         List<GraphContainer> graphs = new();
         HashSet<MonoBehaviour> attributeContainers = new();
@@ -33,7 +38,7 @@ namespace WeavUtils
         protected void InitializeGUIStyles()
         {
             graphLabelStyle = new GUIStyle();
-            graphLabelStyle.fontSize = graphLabelFontSize;
+            graphLabelStyle.fontSize = ScaledFontSize;
         }
 
         public override void Init()
@@ -43,8 +48,8 @@ namespace WeavUtils
             InitializeGUIStyles();
             RegisterAttributes();
 
-            // Default to top right
-            rect.position = new Vector2(Screen.width - GetDraggableRect().width, 0);
+            var windowSize = GetDraggableRect().size;
+            rect.position = CalculateInitialPosition(Settings.graphInitialCorner, Settings.graphInitialOffset, windowSize);
         }
 
         void LateUpdate()
@@ -79,6 +84,8 @@ namespace WeavUtils
 
             if (Event.current.type != EventType.Repaint)
                 return;
+
+            graphLabelStyle.fontSize = ScaledFontSize;
 
             if (cachedLineHeight == 0)
                 cachedLineHeight = GetMultilineStringSize(graphLabelStyle, string.Empty).y;
@@ -256,41 +263,47 @@ namespace WeavUtils
         static Rect GetGroupGraphRect(Vector2 groupOrigin, float graphLabelBoxWidth)
         {
             return new Rect(
-                groupOrigin.x + graphLabelBoxWidth + graphBlockPadding,
+                groupOrigin.x + graphLabelBoxWidth + ScaledBlockPadding,
                 groupOrigin.y,
-                Settings.graphWidth,
-                Settings.graphHeight
+                Settings.ScaledGraphWidth,
+                Settings.ScaledGraphHeight
             );
         }
 
         // IMGUI pass: backgrounds, hover/button logic, labels. No GL calls.
         private void DrawGraphGroup(List<GraphContainer> group, int groupNum)
         {
+            float effectiveScale = Settings.EffectiveScale;
+            int scaledBlockPadding = ScaledBlockPadding;
+            int scaledLabelPadding = ScaledLabelPadding;
+            int scaledScrubberWidth = ScaledScrubberWidth;
+            int scaledGraphWidth = Settings.ScaledGraphWidth;
+            int scaledGraphHeight = Settings.ScaledGraphHeight;
+
             Vector2 relativeMousePos = GetRelativeMousePos(rect);
-            Vector2 graphBlockSize = new Vector2(Settings.graphWidth + graphBlockPadding,
-                Settings.graphHeight + graphBlockPadding);
+            Vector2 graphBlockSize = new Vector2(scaledGraphWidth + scaledBlockPadding, scaledGraphHeight + scaledBlockPadding);
             var groupOrigin = new Vector2(0, graphBlockSize.y * groupNum);
             var groupGraphRect = GetGroupGraphRect(groupOrigin, graphLabelBoxWidth);
 
             // Label background
             DrawRect(new Rect(
-                    groupOrigin.x,
-                    groupOrigin.y,
-                    graphLabelBoxWidth,
-                    Settings.graphHeight),
-                Settings.backgroundColor);
+                groupOrigin.x,
+                groupOrigin.y,
+                graphLabelBoxWidth,
+                scaledGraphHeight),
+            Settings.backgroundColor);
 
             // Graph background
             DrawRect(new Rect(
-                    groupOrigin.x + graphBlockPadding + graphLabelBoxWidth,
-                    groupOrigin.y,
-                    graphBlockSize.x,
-                    Settings.graphHeight),
-                Settings.backgroundColor);
+                groupOrigin.x + scaledBlockPadding + graphLabelBoxWidth,
+                groupOrigin.y,
+                graphBlockSize.x,
+                scaledGraphHeight),
+            Settings.backgroundColor);
 
-            // Magic padding offsets
-            Vector2 textOrigin = groupOrigin + new Vector2(0, 14);
-            Vector2 minMaxOrigin = groupOrigin + new Vector2(graphLabelBoxWidth - 10, 0);
+            // Magic padding offsets (scaled)
+            Vector2 textOrigin = groupOrigin + new Vector2(0, Mathf.RoundToInt(14 * effectiveScale));
+            Vector2 minMaxOrigin = groupOrigin + new Vector2(graphLabelBoxWidth - Mathf.RoundToInt(10 * effectiveScale), 0);
             foreach (var graph in group)
             {
                 var textSize = GetMultilineStringSize(graphLabelStyle, in graph.name);
@@ -299,13 +312,10 @@ namespace WeavUtils
                     GetMultilineStringSize(graphLabelStyle, graph.minString).x,
                     GetMultilineStringSize(graphLabelStyle, graph.maxString).x
                 );
-                minMaxOrigin += Vector2.left * (maxWidthOfMinMaxStrings + graphLabelPadding);
+                minMaxOrigin += Vector2.left * (maxWidthOfMinMaxStrings + scaledLabelPadding);
 
                 // Label button logic
-                var labelRect =
-                    new Rect(
-                        textOrigin - textSize + new Vector2(graphLabelBoxWidth - (graphLabelPadding * 2),
-                            graphLabelPadding), textSize);
+                var labelRect = new Rect(textOrigin - textSize + new Vector2(graphLabelBoxWidth - (scaledLabelPadding * 2), scaledLabelPadding), textSize);
                 var isHovered = labelRect.Contains(relativeMousePos);
                 var isPressed = isHovered && DebugGUIInput.LeftMouseButtonPressed;
 
@@ -323,8 +333,7 @@ namespace WeavUtils
 
                 DrawLabel(labelRect.position, graph.name, style: graphLabelStyle);
                 DrawLabel(minMaxOrigin, graph.maxString, style: graphLabelStyle);
-                DrawLabel(minMaxOrigin + new Vector2(0, Settings.graphHeight - 20), graph.minString,
-                    style: graphLabelStyle);
+                DrawLabel(minMaxOrigin + new Vector2(0, scaledGraphHeight - Mathf.RoundToInt(20 * effectiveScale)), graph.minString, style: graphLabelStyle);
             }
 
             // Scrubber
@@ -335,17 +344,14 @@ namespace WeavUtils
 
                 // Background
                 Vector2 scrubberOrigin = new Vector2(relativeMousePos.x, groupOrigin.y);
-                if (relativeMousePos.x > groupGraphRect.max.x - scrubberBackgroundWidth)
-                    scrubberOrigin.x -= scrubberBackgroundWidth;
+                if (relativeMousePos.x > groupGraphRect.max.x - scaledScrubberWidth)
+                    scrubberOrigin.x -= scaledScrubberWidth;
 
-                DrawRect(
-                    new Rect(scrubberOrigin.x, scrubberOrigin.y, scrubberBackgroundWidth, Settings.graphHeight),
-                    Settings.backgroundColor);
+                DrawRect(new Rect(scrubberOrigin.x, scrubberOrigin.y, scaledScrubberWidth, scaledGraphHeight), Settings.backgroundColor);
 
                 // Scrubber labels
-                Vector2 textPos = scrubberOrigin + new Vector2(graphLabelPadding, graphLabelPadding * 3);
-                int sampleIndex = (int)(groupGraphRect.width - (relativeMousePos.x - groupOrigin.x) +
-                                        graphLabelBoxWidth + graphBlockPadding);
+                Vector2 textPos = scrubberOrigin + new Vector2(scaledLabelPadding, scaledLabelPadding * 3);
+                int sampleIndex = (int)(groupGraphRect.width - (relativeMousePos.x - groupOrigin.x) + graphLabelBoxWidth + scaledBlockPadding);
                 foreach (GraphContainer graph in group)
                 {
                     graphLabelStyle.normal.textColor = graph.color;
@@ -359,9 +365,12 @@ namespace WeavUtils
         // Called from DrawGL() which has already set up the material and pixel matrix.
         private void DrawGraphGroupGL(List<GraphContainer> group, int groupNum)
         {
+            int scaledBlockPadding = ScaledBlockPadding;
+            int scaledGraphWidth = Settings.ScaledGraphWidth;
+            int scaledGraphHeight = Settings.ScaledGraphHeight;
+
             Vector2 relativeMousePos = GetRelativeMousePos(rect);
-            Vector2 graphBlockSize = new Vector2(Settings.graphWidth + graphBlockPadding,
-                Settings.graphHeight + graphBlockPadding);
+            Vector2 graphBlockSize = new Vector2(scaledGraphWidth + scaledBlockPadding, scaledGraphHeight + scaledBlockPadding);
             var groupOrigin = new Vector2(0, graphBlockSize.y * groupNum);
             var groupGraphRect = GetGroupGraphRect(groupOrigin, graphLabelBoxWidth);
 
@@ -372,7 +381,7 @@ namespace WeavUtils
                     graph.Draw(new Rect(
                         groupGraphRect.position + rect.position,
                         groupGraphRect.size
-                    ));
+                    ), scaledGraphHeight);
                 }
             }
 
@@ -380,7 +389,7 @@ namespace WeavUtils
             {
                 DrawLine(
                     new Vector2(relativeMousePos.x, groupOrigin.y),
-                    new Vector2(relativeMousePos.x, groupOrigin.y + Settings.graphHeight),
+                    new Vector2(relativeMousePos.x, groupOrigin.y + scaledGraphHeight),
                     Settings.scrubberColor
                 );
             }
@@ -388,11 +397,15 @@ namespace WeavUtils
 
         private Rect GetGraphWindowRect()
         {
+            int scaledBlockPadding = ScaledBlockPadding;
+            int scaledGraphWidth = Settings.ScaledGraphWidth;
+            int scaledGraphHeight = Settings.ScaledGraphHeight;
+
             return new Rect(
                 new Vector2(-graphLabelBoxWidth, 0) + rect.position,
                 new Vector2(
-                    Settings.graphWidth + graphLabelBoxWidth + graphBlockPadding,
-                    (Settings.graphHeight + graphBlockPadding) * graphGroups.Count
+                    scaledGraphWidth + graphLabelBoxWidth + scaledBlockPadding,
+                    (scaledGraphHeight + scaledBlockPadding) * graphGroups.Count
                 )
             );
         }
@@ -549,21 +562,27 @@ namespace WeavUtils
 
         void RefreshRect()
         {
+            int scaledBlockPadding = ScaledBlockPadding;
+            int scaledGraphWidth = Settings.ScaledGraphWidth;
+            int scaledGraphHeight = Settings.ScaledGraphHeight;
+
             var lastWidth = rect.width;
             RecalculateGraphLabelWidth();
             rect.size = new Vector2(
-                Settings.graphWidth + graphLabelBoxWidth + graphBlockPadding,
-                (Settings.graphHeight + graphBlockPadding) * graphGroups.Count);
+                scaledGraphWidth + graphLabelBoxWidth + scaledBlockPadding,
+                (scaledGraphHeight + scaledBlockPadding) * graphGroups.Count);
             // Grow to the left instead of right
             rect.position += new Vector2(lastWidth - rect.width, 0);
         }
 
         void RecalculateGraphLabelWidth()
         {
+            int scaledLabelPadding = ScaledLabelPadding;
+
             float width = 0;
             foreach (var group in graphGroups.Values)
             {
-                float minMaxWidth = graphLabelPadding;
+                float minMaxWidth = scaledLabelPadding;
                 foreach (var graph in group)
                 {
                     // Names
@@ -574,13 +593,11 @@ namespace WeavUtils
                         GetMultilineStringSize(graphLabelStyle, graph.minString).x,
                         GetMultilineStringSize(graphLabelStyle, graph.maxString).x
                     );
-                    minMaxWidth += maxWidthOfMinMaxStrings + graphLabelPadding;
+                    minMaxWidth += maxWidthOfMinMaxStrings + scaledLabelPadding;
                 }
-
                 width = Mathf.Max(minMaxWidth, width);
             }
-
-            graphLabelBoxWidth = width + graphLabelPadding * 2;
+            graphLabelBoxWidth = width + scaledLabelPadding * 2;
         }
 
         static bool TryConvertToFloat(object value, out float result)
@@ -679,7 +696,7 @@ namespace WeavUtils
                 }
             }
 
-            public void Draw(Rect rect)
+            public void Draw(Rect rect, int scaledGraphHeight)
             {
                 GL.Begin(GL.LINE_STRIP);
                 {
@@ -692,7 +709,7 @@ namespace WeavUtils
                         // Note flipped inverse lerp min max to account for y = down in GL
                         GL.Vertex3(
                             rect.x + (rect.width * ((float)i / num)),
-                            rect.y + (Mathf.InverseLerp(max, min, value) * Settings.graphHeight),
+                            rect.y + (Mathf.InverseLerp(max, min, value) * scaledGraphHeight),
                             0.0f);
                     }
                 }
