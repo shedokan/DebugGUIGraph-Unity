@@ -185,7 +185,7 @@ namespace WeavUtils
 
         private void RegisterAttributes()
         {
-            foreach (var mb in FindObjectsOfType<MonoBehaviour>())
+            foreach (var mb in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
             {
                 Type mbType = mb.GetType();
 

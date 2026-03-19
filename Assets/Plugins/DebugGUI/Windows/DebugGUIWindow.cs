@@ -50,10 +50,10 @@ namespace WeavUtils
         void Update()
         {
             // Flip mouse Y
-            var mousePos = Input.mousePosition;
+            var mousePos = DebugGUIInput.MousePosition;
             mousePos.y = Screen.height - mousePos.y;
 
-            if (Input.GetMouseButtonDown(2))
+            if (DebugGUIInput.MiddleMouseButtonDown)
             {
                 if (!dragInProgress)
                 {
@@ -65,7 +65,7 @@ namespace WeavUtils
                     }
                 }
             }
-            else if (Input.GetMouseButtonUp(2))
+            else if (DebugGUIInput.MiddleMouseButtonUp)
             {
                 if (dragged) dragInProgress = false;
                 dragged = false;

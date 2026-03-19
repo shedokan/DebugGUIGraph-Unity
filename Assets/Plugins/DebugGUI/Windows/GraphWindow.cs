@@ -46,7 +46,7 @@ namespace WeavUtils
 
         void LateUpdate()
         {
-            if (!Input.GetMouseButton(0))
+            if (!DebugGUIInput.LeftMouseButtonPressed)
             {
                 freezeGraphs = false;
             }
@@ -227,7 +227,7 @@ namespace WeavUtils
         GraphContainer lastPressedGraphLabel;
         private void DrawGraphGroup(List<GraphContainer> group, int groupNum)
         {
-            Vector2 relativeMousePos = Input.mousePosition;
+            Vector2 relativeMousePos = DebugGUIInput.MousePosition;
             relativeMousePos.y = Screen.height - relativeMousePos.y;
             relativeMousePos -= rect.position;
 
@@ -274,7 +274,7 @@ namespace WeavUtils
                 var labelRect = new Rect(textOrigin - textSize + new Vector2(graphLabelBoxWidth - (graphLabelPadding * 2), graphLabelPadding), textSize);
                 // Enable disable
                 var isHovered = labelRect.Contains(relativeMousePos);
-                var isPressed = isHovered && Input.GetMouseButton(0);
+                var isPressed = isHovered && DebugGUIInput.LeftMouseButtonPressed;
 
                 // Button click
                 if (lastPressedGraphLabel == graph && !isPressed && isHovered)
@@ -327,7 +327,7 @@ namespace WeavUtils
             // Scrubber
             if (groupGraphRect.Contains(relativeMousePos))
             {
-                if (Input.GetMouseButton(0))
+                if (DebugGUIInput.LeftMouseButtonPressed)
                 {
                     freezeGraphs = true;
                 }
@@ -389,7 +389,7 @@ namespace WeavUtils
 
         private void RegisterAttributes()
         {
-            foreach (var mb in FindObjectsOfType<MonoBehaviour>())
+            foreach (var mb in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
             {
                 Type mbType = mb.GetType();
 

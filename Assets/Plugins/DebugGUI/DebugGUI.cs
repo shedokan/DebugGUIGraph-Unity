@@ -16,7 +16,7 @@ public partial class DebugGUI : MonoBehaviour
         {
             if (_instance == null && !quitting)
             {
-                _instance = FindObjectOfType<DebugGUI>();
+                _instance = FindAnyObjectByType<DebugGUI>();
 
                 if (_instance == null && Application.isPlaying)
                 {

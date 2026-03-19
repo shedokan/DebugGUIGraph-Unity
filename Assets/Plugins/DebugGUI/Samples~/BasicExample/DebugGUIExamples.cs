@@ -79,7 +79,7 @@ public class DebugGUIExamples : MonoBehaviour
         SinField = Mathf.Sin(Time.time * 6);
 
         // Update graphed mouse XY values
-        var mousePos = Input.mousePosition;
+        var mousePos = DebugGUIInput.MousePosition;
         var screenSize = Screen.currentResolution;
         mouseX = Mathf.Clamp(mousePos.x, 0, screenSize.width);
         mouseY = Mathf.Clamp(mousePos.y, 0, screenSize.height);
@@ -89,7 +89,7 @@ public class DebugGUIExamples : MonoBehaviour
         DebugGUI.LogPersistent("frameRate", "FPS: " + (1 / Time.deltaTime).ToString("F3"));
 
         // Manual logging of mouse clicks
-        if (Input.GetMouseButton(0))
+        if (DebugGUIInput.LeftMouseButtonPressed)
         {
             DebugGUI.Log(string.Format(
                 "Mouse down ({0}, {1})",
@@ -107,12 +107,12 @@ public class DebugGUIExamples : MonoBehaviour
             DebugGUI.Graph("frameRate", 1 / Time.deltaTime);
         }
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (DebugGUIInput.GetKeyDown(KeyCode.Space))
         {
             Destroy(this);
         }
 
-        if (Input.GetKeyDown(KeyCode.E))
+        if (DebugGUIInput.GetKeyDown(KeyCode.E))
         {
             Debug.Log(DebugGUI.ExportGraphs());
         }
