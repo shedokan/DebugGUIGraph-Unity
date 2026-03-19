@@ -47,6 +47,8 @@ namespace WeavUtils
 
         protected override void OnGUI()
         {
+            if(!IsInitialized) return;
+
             base.OnGUI();
 
             // Only draw once per frame

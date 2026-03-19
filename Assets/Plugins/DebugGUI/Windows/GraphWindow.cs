@@ -63,6 +63,8 @@ namespace WeavUtils
 
         protected override void OnGUI()
         {
+            if(!IsInitialized) return;
+            
             base.OnGUI();
 
             if (Event.current.type != EventType.Repaint)

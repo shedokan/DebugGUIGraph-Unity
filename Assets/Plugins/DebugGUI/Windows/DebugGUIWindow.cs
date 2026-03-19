@@ -11,6 +11,7 @@ namespace WeavUtils
         static bool dragInProgress;
         bool dragged;
 
+        protected bool IsInitialized;
         protected Rect rect;
         protected float cachedLineHeight;
 
@@ -43,9 +44,8 @@ namespace WeavUtils
         public virtual void Init()
         {
             if (drawMat == null)
-            {
                 drawMat = CreateMaterial();
-            }
+            IsInitialized = true;
         }
 
         protected virtual void OnEnable()
