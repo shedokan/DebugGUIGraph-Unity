@@ -1,7 +1,9 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 using static DebugGUI;
 
 namespace WeavUtils
@@ -20,6 +22,7 @@ namespace WeavUtils
         Dictionary<MonoBehaviour, List<GraphAttributeKey>> attributeKeys = new();
         Dictionary<Type, HashSet<FieldInfo>> debugGUIGraphFields = new();
         Dictionary<Type, HashSet<PropertyInfo>> debugGUIGraphProperties = new();
+        Dictionary<Type, HashSet<MethodInfo>> debugGUIGraphMethods = new();
         SortedDictionary<int, List<GraphContainer>> graphGroups = new();
 
         bool freezeGraphs;
@@ -209,23 +212,31 @@ namespace WeavUtils
         {
             foreach (var node in attributeContainers)
             {
-                if (node != null && attributeKeys.ContainsKey(node))
+                if (!node || !attributeKeys.TryGetValue(node, out var attributeKey))
+                    continue;
+
+                foreach (var key in attributeKey)
                 {
-                    foreach (var key in attributeKeys[node])
-                    {
-                        if (key.memberInfo is FieldInfo fieldInfo)
-                        {
-                            float? val = fieldInfo.GetValue(node) as float?;
-                            if (val != null)
-                                graphDictionary[key].Push(val.Value);
-                        }
-                        else if (key.memberInfo is PropertyInfo propertyInfo)
-                        {
-                            float? val = propertyInfo.GetValue(node, null) as float?;
-                            if (val != null)
-                                graphDictionary[key].Push(val.Value);
-                        }
+                    var val = TryGetMemberValue(key.memberInfo, node);
+                    if(val == null) continue;
+
+                    if (val is float fVal)
+                        graphDictionary[key].Push(fVal);
+                    else if (val is int i)
+                        graphDictionary[key].Push(i);
+                    else if (val is Vector2 vec2){
+                        graphDictionary[key].Push(vec2.x);
+                        // TODO: Support x and y together
+                        // graphDictionary[key + "_y"].Push(vec2.y);
                     }
+                    else if (val is Vector3 vec3){
+                        graphDictionary[key].Push(vec3.x);
+                        // TODO: Support x and y and z together
+                        // graphDictionary[key + "_y"].Push(vec3.y);
+                        // graphDictionary[key + "_z"].Push(vec3.z);
+                    }
+                    else
+                        Debug.LogWarning($"Unsupported DebugGUIGraph attribute type: {val.GetType()}");
                 }
             }
         }
@@ -395,116 +406,121 @@ namespace WeavUtils
 
         private void RegisterAttributes()
         {
+            var bindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
             foreach (var mb in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
             {
                 Type mbType = mb.GetType();
-
                 HashSet<MonoBehaviour> uniqueAttributeContainers = new();
 
-                // Fields
+                // Ensure collections exist for this type
+                if (!debugGUIGraphFields.ContainsKey(mbType)) debugGUIGraphFields[mbType] = new HashSet<FieldInfo>();
+                if (!debugGUIGraphProperties.ContainsKey(mbType)) debugGUIGraphProperties[mbType] = new HashSet<PropertyInfo>();
+                // Assuming you have added a dictionary for methods:
+                if (!debugGUIGraphMethods.ContainsKey(mbType)) debugGUIGraphMethods[mbType] = new HashSet<MethodInfo>();
+
+                // Retrieve Fields, Properties, and Methods in one unified collection
+                var members = mbType.GetMembers(bindingFlags)
+                    .Where(m => m.MemberType == MemberTypes.Field || 
+                                m.MemberType == MemberTypes.Property || 
+                                m.MemberType == MemberTypes.Method);
+
+                foreach (var member in members)
                 {
-                    // Retreive the fields from the mono instance
-                    FieldInfo[] objectFields = mbType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                    // search all fields/properties for the [DebugGUIVar] attribute
-                    for (int i = 0; i < objectFields.Length; i++)
+                    if (Attribute.GetCustomAttribute(member, typeof(DebugGUIGraphAttribute)) is DebugGUIGraphAttribute graphAttribute)
                     {
-                        DebugGUIGraphAttribute graphAttribute = Attribute.GetCustomAttribute(objectFields[i], typeof(DebugGUIGraphAttribute)) as DebugGUIGraphAttribute;
-
-                        if (graphAttribute != null)
+                        // Attempt to extract the value as a float
+                        var value = TryGetMemberValue(member, mb);
+                        if (!IsSupportedType(value))
                         {
-                            // Can't cast to float so we don't bother registering it
-                            if (objectFields[i].GetValue(mb) as float? == null)
-                            {
-                                Debug.LogError($"Cannot cast {mbType.Name}.{objectFields[i].Name} to float. This member will be ignored.");
-                                continue;
-                            }
-
-                            uniqueAttributeContainers.Add(mb);
-                            if (!debugGUIGraphFields.ContainsKey(mbType))
-                                debugGUIGraphFields.Add(mbType, new HashSet<FieldInfo>());
-                            if (!debugGUIGraphProperties.ContainsKey(mbType))
-                                debugGUIGraphProperties.Add(mbType, new HashSet<PropertyInfo>());
-
-                            debugGUIGraphFields[mbType].Add(objectFields[i]);
-                            GraphContainer graph =
-                                new GraphContainer(Settings.graphWidth, graphAttribute.group)
-                                {
-                                    name = objectFields[i].Name,
-                                    max = graphAttribute.max,
-                                    min = graphAttribute.min,
-                                    autoScale = graphAttribute.autoScale
-                                };
-                            graph.OnLabelSizeChange += RefreshRect;
-                            if (!graphAttribute.color.Equals(default(Color)))
-                                graph.color = graphAttribute.color;
-
-                            var key = new GraphAttributeKey(objectFields[i]);
-                            if (!attributeKeys.ContainsKey(mb))
-                                attributeKeys.Add(mb, new List<GraphAttributeKey>());
-                            attributeKeys[mb].Add(key);
-
-                            AddGraph(key, graph);
+                            Debug.LogError($"Type {value.GetType()} returned by {mbType.Name}.{member.Name} is not supported supported (or method requires parameters). This member will be ignored.");
+                            continue;
                         }
+
+                        uniqueAttributeContainers.Add(mb);
+                        GraphAttributeKey key = null;
+
+                        // Route the member to its specific collection and generate the key
+                        if (member is FieldInfo field)
+                        {
+                            debugGUIGraphFields[mbType].Add(field);
+                            key = new GraphAttributeKey(field);
+                        }
+                        else if (member is PropertyInfo property)
+                        {
+                            debugGUIGraphProperties[mbType].Add(property);
+                            key = new GraphAttributeKey(property);
+                        }
+                        else if (member is MethodInfo method)
+                        {
+                            debugGUIGraphMethods[mbType].Add(method);
+                            key = new GraphAttributeKey(method); // Note: See prerequisites below
+                        }
+
+                        // Build and configure the graph
+                        GraphContainer graph = new GraphContainer(Settings.graphWidth, graphAttribute.group)
+                        {
+                            name = member.Name,
+                            max = graphAttribute.max,
+                            min = graphAttribute.min,
+                            autoScale = graphAttribute.autoScale
+                        };
+                        graph.OnLabelSizeChange += RefreshRect;
+                        
+                        if (!graphAttribute.color.Equals(default(Color)))
+                            graph.color = graphAttribute.color;
+
+                        // Register the key
+                        if (!attributeKeys.ContainsKey(mb))
+                            attributeKeys[mb] = new List<GraphAttributeKey>();
+                        
+                        attributeKeys[mb].Add(key);
+                        AddGraph(key, graph);
                     }
                 }
 
-                // Properties
-                {
-                    PropertyInfo[] objectProperties = mbType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                    for (int i = 0; i < objectProperties.Length; i++)
-                    {
-                        if (Attribute.GetCustomAttribute(objectProperties[i], typeof(DebugGUIGraphAttribute)) is DebugGUIGraphAttribute graphAttribute)
-                        {
-                            // Can't cast to float so we don't bother registering it
-                            if (objectProperties[i].GetValue(mb, null) as float? == null)
-                            {
-                                Debug.LogError($"Cannot cast {mbType.Name}.{objectProperties[i].Name} to float. This member will be ignored.");
-                                continue;
-                            }
-
-                            uniqueAttributeContainers.Add(mb);
-
-                            if (!debugGUIGraphFields.ContainsKey(mbType))
-                                debugGUIGraphFields.Add(mbType, new HashSet<FieldInfo>());
-                            if (!debugGUIGraphProperties.ContainsKey(mbType))
-                                debugGUIGraphProperties.Add(mbType, new HashSet<PropertyInfo>());
-
-                            debugGUIGraphProperties[mbType].Add(objectProperties[i]);
-
-                            GraphContainer graph =
-                                new GraphContainer(Settings.graphWidth, graphAttribute.group)
-                                {
-                                    name = objectProperties[i].Name,
-                                    max = graphAttribute.max,
-                                    min = graphAttribute.min,
-                                    autoScale = graphAttribute.autoScale
-                                };
-                            graph.OnLabelSizeChange += RefreshRect;
-                            if (!graphAttribute.color.Equals(default(Color)))
-                                graph.color = graphAttribute.color;
-
-                            var key = new GraphAttributeKey(objectProperties[i]);
-                            if (!attributeKeys.ContainsKey(mb))
-                                attributeKeys.Add(mb, new List<GraphAttributeKey>());
-                            attributeKeys[mb].Add(key);
-
-                            AddGraph(key, graph);
-                        }
-                    }
-                }
-
+                // Tally up the containers
                 foreach (var attributeContainer in uniqueAttributeContainers)
                 {
                     attributeContainers.Add(attributeContainer);
                     Type type = attributeContainer.GetType();
+                    
                     if (!typeInstanceCounts.ContainsKey(type))
-                        typeInstanceCounts.Add(type, 0);
+                        typeInstanceCounts[type] = 0;
+                        
                     typeInstanceCounts[type]++;
                 }
             }
         }
+        // Local helper function to safely extract values from any member type
+        [CanBeNull]
+        private object TryGetMemberValue(MemberInfo memberInfo, MonoBehaviour instance)
+        {
+            try
+            {
+                if(memberInfo is MethodInfo met)
+                {
+                    Debug.Log($"{memberInfo}.{memberInfo.Name}: {met.GetParameters()}");
+                }
+                return memberInfo switch
+                {
+                    FieldInfo f => f.GetValue(instance),
+                    PropertyInfo p => p.GetValue(instance, null),
+                    // For methods, ensure there are no required parameters before invoking
+                    MethodInfo m => m.GetParameters().Count((p) => !p.HasDefaultValue) == 0 ? m.Invoke(instance, null) : null,
+                    _ => null
+                };
+            }
+            catch(Exception e)
+            {
+                Debug.LogWarning($"[TryGetMemberValue] Exception: {memberInfo}.{memberInfo.Name}: {e}");
+                // Catches invocation exceptions (e.g., property getter throws)
+                return null;
+            }
+        }
+
+                        // TODO: Test tjat the tpes supported here and polling are the same
+        private bool IsSupportedType(object value) => value is float or int or Vector2 or Vector3;
 
         private void CleanUpDeletedAttributes()
         {
@@ -519,6 +535,7 @@ namespace WeavUtils
                     {
                         RemoveGraph(key);
                     }
+
                     attributeKeys.Remove(mb);
 
                     Type type = mb.GetType();
@@ -566,8 +583,10 @@ namespace WeavUtils
                     );
                     minMaxWidth += maxWidthOfMinMaxStrings + graphLabelPadding;
                 }
+
                 width = Mathf.Max(minMaxWidth, width);
             }
+
             graphLabelBoxWidth = width + graphLabelPadding * 2;
         }
 

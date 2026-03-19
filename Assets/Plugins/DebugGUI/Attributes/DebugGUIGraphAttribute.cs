@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System;
 
-[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method)]
 public class DebugGUIGraphAttribute : Attribute
 {
     public float min { get; private set; }

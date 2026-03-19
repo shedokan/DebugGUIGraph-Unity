@@ -48,6 +48,32 @@ namespace WeavUtils
             }
         }
 
+        protected virtual void OnEnable()
+        {
+            // SRP (URP / HDRP) — endCameraRendering fires after each camera finishes
+            RenderPipelineManager.endCameraRendering += OnSRPEndCameraRendering;
+        }
+
+        protected virtual void OnDisable()
+        {
+            RenderPipelineManager.endCameraRendering -= OnSRPEndCameraRendering;
+        }
+
+        void OnSRPEndCameraRendering(ScriptableRenderContext ctx, Camera cam)
+        {
+            if (cam != Camera.main) return;
+            RenderGLOverlay();
+        }
+
+        // Called by the built-in render pipeline after the camera renders the scene.
+        // Skipped when an SRP is active (handled by endCameraRendering above).
+        void OnRenderObject()
+        {
+            if (GraphicsSettings.currentRenderPipeline != null) return;
+            if (Camera.current != Camera.main) return;
+            RenderGLOverlay();
+        }
+
         void Update()
         {
             // Flip mouse Y
