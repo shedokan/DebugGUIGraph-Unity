@@ -62,6 +62,12 @@ namespace WeavUtils
         {
             base.OnGUI();
 
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            if (cachedLineHeight == 0)
+                cachedLineHeight = GetMultilineStringSize(graphLabelStyle, string.Empty).y;
+
             int groupNum = 0;
             foreach (var group in graphGroups.Values)
             {
@@ -371,7 +377,7 @@ namespace WeavUtils
                         color: graph.color
                     );
 
-                    textPos.y += GetMultilineStringSize(graphLabelStyle, in string.Empty).y;
+                    textPos.y += cachedLineHeight;
                 }
             }
         }
@@ -507,6 +513,7 @@ namespace WeavUtils
             {
                 if (mb == null)
                 {
+                    if (!attributeKeys.ContainsKey(mb)) continue;
                     var keys = attributeKeys[mb];
                     foreach (var key in keys)
                     {

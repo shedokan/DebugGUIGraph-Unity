@@ -63,7 +63,9 @@ namespace WeavUtils
             GUI.color = Color.white;
             GUI.backgroundColor = DebugGUI.Settings.backgroundColor;
 
-            var lineHeight = GetMultilineStringSize(textStyle, in string.Empty).y;
+            if (cachedLineHeight == 0)
+                cachedLineHeight = GetMultilineStringSize(textStyle, string.Empty).y;
+            var lineHeight = cachedLineHeight;
             
             persistentLogStringBuilder.Clear();
 

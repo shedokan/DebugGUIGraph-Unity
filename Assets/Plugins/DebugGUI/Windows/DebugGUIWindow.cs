@@ -12,6 +12,7 @@ namespace WeavUtils
         bool dragged;
 
         protected Rect rect;
+        protected float cachedLineHeight;
 
         Vector3 lastMousePos;
 
