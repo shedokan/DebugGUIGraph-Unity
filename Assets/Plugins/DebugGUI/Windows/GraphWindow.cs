@@ -698,20 +698,42 @@ namespace WeavUtils
 
             public void Draw(Rect rect, int scaledGraphHeight)
             {
-                GL.Begin(GL.LINE_STRIP);
-                {
-                    GL.Color(color);
+                float halfThickness = Settings.ScaledLineThickness * 0.5f;
+                int num = values.Length;
+                if (num < 2) return;
 
-                    int num = values.Length;
-                    for (int i = 0; i < num; i++)
-                    {
-                        float value = values[Mod(currentIndex - i - 1, values.Length)];
-                        // Note flipped inverse lerp min max to account for y = down in GL
-                        GL.Vertex3(
-                            rect.x + (rect.width * ((float)i / num)),
-                            rect.y + (Mathf.InverseLerp(max, min, value) * scaledGraphHeight),
-                            0.0f);
-                    }
+                // Build points
+                for (int i = 0; i < num; i++)
+                {
+                    float value = values[Mod(currentIndex - i - 1, values.Length)];
+                    float x = rect.x + (rect.width * ((float)i / num));
+                    float y = rect.y + (Mathf.InverseLerp(max, min, value) * scaledGraphHeight);
+                    graphPoints[i] = new Vector2(x, y);
+                }
+
+                // Draw as triangle strip with perpendicular offset per segment
+                GL.Begin(GL.TRIANGLE_STRIP);
+                GL.Color(color);
+                for (int i = 0; i < num; i++)
+                {
+                    Vector2 dir;
+                    if (i == 0)
+                        dir = graphPoints[1] - graphPoints[0];
+                    else if (i == num - 1)
+                        dir = graphPoints[num - 1] - graphPoints[num - 2];
+                    else
+                        dir = graphPoints[i + 1] - graphPoints[i - 1];
+
+                    float len = dir.magnitude;
+                    if (len < 0.0001f) dir = Vector2.right;
+                    else dir /= len;
+
+                    // Perpendicular
+                    float px = -dir.y * halfThickness;
+                    float py = dir.x * halfThickness;
+
+                    GL.Vertex3(graphPoints[i].x + px, graphPoints[i].y + py, 0f);
+                    GL.Vertex3(graphPoints[i].x - px, graphPoints[i].y - py, 0f);
                 }
                 GL.End();
             }

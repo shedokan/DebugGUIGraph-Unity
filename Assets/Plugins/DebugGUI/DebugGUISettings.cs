@@ -16,6 +16,7 @@ public class DebugGUISettings : ScriptableObject
 
     [SerializeField] public float scale = 1f;
     [SerializeField] public bool autoDPIScale = false;
+    [SerializeField] public float lineThickness = 2f;
 
     [SerializeField] public ScreenCorner graphInitialCorner = ScreenCorner.TopRight;
     [SerializeField] public Vector2 graphInitialOffset = new Vector2(0, 20);
@@ -28,4 +29,5 @@ public class DebugGUISettings : ScriptableObject
 
     public int ScaledGraphWidth => Mathf.RoundToInt(graphWidth * EffectiveScale);
     public int ScaledGraphHeight => Mathf.RoundToInt(graphHeight * EffectiveScale);
+    public float ScaledLineThickness => lineThickness * EffectiveScale;
 }

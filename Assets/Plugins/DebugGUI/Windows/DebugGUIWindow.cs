@@ -192,17 +192,24 @@ namespace WeavUtils
             GUI.color = prevColor;
         }
 
-        // Draws a line using GL. Call this from DrawGL() only.
+        // Draws a thick line using GL quads. Call this from DrawGL() only.
         protected void DrawLine(Vector2 start, Vector2 end, Color color)
         {
             start += rect.position;
             end += rect.position;
 
-            GL.Begin(GL.LINES);
+            float halfThickness = DebugGUI.Settings.ScaledLineThickness * 0.5f;
+            Vector2 dir = (end - start).normalized;
+            // Perpendicular offset for thickness
+            Vector2 perp = new Vector2(-dir.y, dir.x) * halfThickness;
+
+            GL.Begin(GL.QUADS);
             {
                 GL.Color(color);
-                GL.Vertex(start);
-                GL.Vertex(end);
+                GL.Vertex3(start.x - perp.x, start.y - perp.y, 0f);
+                GL.Vertex3(start.x + perp.x, start.y + perp.y, 0f);
+                GL.Vertex3(end.x + perp.x, end.y + perp.y, 0f);
+                GL.Vertex3(end.x - perp.x, end.y - perp.y, 0f);
             }
             GL.End();
         }
