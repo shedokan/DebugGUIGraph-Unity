@@ -14,11 +14,11 @@ public partial class DebugGUI : MonoBehaviour
     {
         get
         {
-            if (_instance == null && !quitting)
+            if (!_instance && !quitting)
             {
                 _instance = FindAnyObjectByType<DebugGUI>();
 
-                if (_instance == null && Application.isPlaying)
+                if (!_instance && Application.isPlaying)
                 {
                     _instance = new GameObject("DebugGUI").AddComponent<DebugGUI>();
                 }
@@ -162,6 +162,15 @@ public partial class DebugGUI : MonoBehaviour
 
     void Awake()
     {
+        // Only one instance
+        if (_instance != null)
+        {
+            Destroy(this);
+            return;
+        }
+
+        _instance = this;
+        
         if (!initialized)
             Init();
     }
@@ -173,8 +182,7 @@ public partial class DebugGUI : MonoBehaviour
     {
         if (Instance == null) return;
         Instance._settings.enableGraphs = enabled;
-        if (Instance.graphWindow)
-            Instance.graphWindow.gameObject.SetActive(enabled);
+        Instance.graphWindow?.gameObject.SetActive(enabled);
     }
 
     /// <summary>
@@ -184,8 +192,7 @@ public partial class DebugGUI : MonoBehaviour
     {
         if (Instance == null) return;
         Instance._settings.enableLogs = enabled;
-        if (Instance.logWindow)
-            Instance.logWindow.gameObject.SetActive(enabled);
+        Instance.logWindow?.gameObject.SetActive(enabled);
     }
 
     /// <summary>
@@ -202,7 +209,6 @@ public partial class DebugGUI : MonoBehaviour
         Application.quitting += () => quitting = true;
         initialized = true;
         _settings = Resources.Load<DebugGUISettings>("DebugGUISettings");
-
         DontDestroyOnLoad(gameObject);
 
         graphWindow = new GameObject("Graph").AddComponent<GraphWindow>();
