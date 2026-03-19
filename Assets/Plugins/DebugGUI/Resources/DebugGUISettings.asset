@@ -19,3 +19,10 @@ MonoBehaviour:
   graphWidth: 300
   graphHeight: 100
   temporaryLogLifetime: 5
+  scale: 2.5
+  autoDPIScale: 1
+  lineThickness: 1
+  graphInitialCorner: 2
+  graphInitialOffset: {x: 20, y: 20}
+  logInitialCorner: 2
+  logInitialOffset: {x: 0, y: 0}
