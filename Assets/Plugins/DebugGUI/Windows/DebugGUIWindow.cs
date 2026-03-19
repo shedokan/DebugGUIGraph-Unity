@@ -14,7 +14,7 @@ namespace WeavUtils
         protected Rect rect;
         protected float cachedLineHeight;
 
-        Vector3 lastMousePos;
+        Vector2 lastMousePos;
 
         static Material drawMat;
         Material CreateMaterial()
