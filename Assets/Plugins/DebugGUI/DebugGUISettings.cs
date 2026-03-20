@@ -15,17 +15,34 @@ public class DebugGUISettings : ScriptableObject
     [SerializeField] public float temporaryLogLifetime = 5;
 
     [SerializeField] public float scale = 1f;
-    [SerializeField] public bool autoDPIScale = false;
     [SerializeField] public float lineThickness = 2f;
+
+    // Replicates Unity's Canvas Scaler "Scale With Screen Size" formula.
+    // graph sizes are authored at referenceResolution; scale is applied on top.
+    [SerializeField] public bool scaleWithScreenSize = false;
+    [SerializeField] public Vector2 referenceResolution = new Vector2(1080, 2340);
+    // 0 = match width, 1 = match height, 0.5 = blend (same as Canvas Scaler slider)
+    [SerializeField] [Range(0f, 1f)] public float matchWidthOrHeight = 0.5f;
 
     [SerializeField] public ScreenCorner graphInitialCorner = ScreenCorner.TopRight;
     [SerializeField] public Vector2 graphInitialOffset = new Vector2(0, 20);
     [SerializeField] public ScreenCorner logInitialCorner = ScreenCorner.TopLeft;
     [SerializeField] public Vector2 logInitialOffset = Vector2.zero;
 
-    public float EffectiveScale => autoDPIScale && Screen.dpi > 0
-        ? scale * (Screen.dpi / 96f)
-        : scale;
+    public float EffectiveScale
+    {
+        get
+        {
+            if (scaleWithScreenSize && referenceResolution.x > 0 && referenceResolution.y > 0)
+            {
+                // Same log-space blend Unity's CanvasScaler uses internally
+                float logW = Mathf.Log(Screen.width  / referenceResolution.x, 2f);
+                float logH = Mathf.Log(Screen.height / referenceResolution.y, 2f);
+                return scale * Mathf.Pow(2f, Mathf.Lerp(logW, logH, matchWidthOrHeight));
+            }
+            return scale;
+        }
+    }
 
     public int ScaledGraphWidth => Mathf.RoundToInt(graphWidth * EffectiveScale);
     public int ScaledGraphHeight => Mathf.RoundToInt(graphHeight * EffectiveScale);

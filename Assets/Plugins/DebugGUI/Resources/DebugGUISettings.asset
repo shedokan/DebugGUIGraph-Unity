@@ -19,9 +19,11 @@ MonoBehaviour:
   graphWidth: 300
   graphHeight: 100
   temporaryLogLifetime: 5
-  scale: 2.5
-  autoDPIScale: 1
+  scale: 2.6
   lineThickness: 1
+  scaleWithScreenSize: 1
+  referenceResolution: {x: 1080, y: 2340}
+  matchWidthOrHeight: 0
   graphInitialCorner: 2
   graphInitialOffset: {x: 20, y: 20}
   logInitialCorner: 2
