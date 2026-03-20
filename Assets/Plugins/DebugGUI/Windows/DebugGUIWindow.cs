@@ -131,6 +131,7 @@ namespace WeavUtils
                     {
                         dragged = true;
                         dragInProgress = true;
+                        lastMousePos = mousePos; // seed so first delta is zero in touch
                     }
                 }
             }

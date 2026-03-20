@@ -325,8 +325,9 @@ namespace WeavUtils
                 var isHovered = labelRect.Contains(relativeMousePos);
                 var isPressed = isHovered && DebugGUIInput.LeftMouseButtonPressed;
 
-                // Button click
-                if (lastPressedGraphLabel == graph && !isPressed && isHovered)
+                // Button click — don't re-check hover on release; on touch, MousePosition
+                // reverts to cursor when finger lifts, so isHovered would be false.
+                if (lastPressedGraphLabel == graph && !isPressed)
                     graph.visible = !graph.visible;
 
                 if (isPressed)
