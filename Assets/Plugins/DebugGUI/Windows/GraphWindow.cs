@@ -729,9 +729,12 @@ namespace WeavUtils
             private int currentIndex;
             private readonly float[] values;
             private readonly Vector2[] graphPoints;
+            private bool _observedSeeded;
+            private float _observedMin;
+            private float _observedMax;
 
-            public string minString = null;
-            public string maxString = null;
+            public string minString = "-";
+            public string maxString = "-";
             public bool visible = true;
 
             public GraphContainer(int width, int group = 0)
@@ -739,7 +742,6 @@ namespace WeavUtils
                 this.group = group;
                 values = new float[width];
                 graphPoints = new Vector2[width];
-                SetMinMax(min, max);
             }
 
             public Color GetModifiedColor(bool highlighted)
@@ -755,20 +757,42 @@ namespace WeavUtils
 
             public void SetMinMax(float min, float max)
             {
-                OnLabelSizeChange?.Invoke();
                 this.min = min;
                 this.max = max;
+            }
 
-                minString = min.ToString("F2");
-                maxString = max.ToString("F2");
+            private void RefreshStrings()
+            {
+                var newMin = _observedMin.ToString("F2");
+                var newMax = _observedMax.ToString("F2");
+                if (newMin == minString && newMax == maxString) return;
+                minString = newMin;
+                maxString = newMax;
+                OnLabelSizeChange?.Invoke();
             }
 
             // Add a data point to the beginning of the graph
             public void Push(float val)
             {
-                if (autoScale && (val > max || val < min))
+                // Always track actual observed range for label display (before clamping)
+                if (!_observedSeeded)
                 {
-                    SetMinMax(Mathf.Min(val, min), Mathf.Max(val, max));
+                    _observedMin = _observedMax = val;
+                    _observedSeeded = true;
+                    RefreshStrings();
+                }
+                else if (val < _observedMin || val > _observedMax)
+                {
+                    _observedMin = Mathf.Min(_observedMin, val);
+                    _observedMax = Mathf.Max(_observedMax, val);
+                    RefreshStrings();
+                }
+
+                if (autoScale)
+                {
+                    // Expand scale range to fit observed data
+                    min = _observedMin;
+                    max = _observedMax;
                 }
                 else
                 {
@@ -783,9 +807,10 @@ namespace WeavUtils
             public void Clear()
             {
                 for (int i = 0; i < values.Length; i++)
-                {
                     values[i] = 0;
-                }
+                _observedSeeded = false;
+                minString = "-";
+                maxString = "-";
             }
 
             public void Draw(Rect rect, int scaledGraphHeight)
