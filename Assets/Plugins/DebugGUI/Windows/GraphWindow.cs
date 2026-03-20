@@ -98,6 +98,7 @@ namespace WeavUtils
             }
         }
 
+        // TODO: Support non-float values
         public void Graph(object key, float val)
         {
             if (!graphDictionary.ContainsKey(key))

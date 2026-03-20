@@ -46,8 +46,13 @@ public partial class DebugGUI : MonoBehaviour
     /// <param name="max">Value at the top of the graph box</param>
     /// <param name="group">The graph's ordinal position on screen</param>
     /// <param name="color">The graph's color</param>
-    public static void SetGraphProperties(object key, string label, float min, float max, int group, Color color, bool autoScale)
+    /// <param name="autoScale">Autoscales</param>
+    public static void SetGraphProperties(object key, string label, float min = 0f, float max = 1f, int group = 0, Color color = default, bool autoScale = true)
     {
+        if (color == default)
+        {
+            color = Color.black;
+        }
         Instance.graphWindow.SetGraphProperties(key, label, min, max, group, color, autoScale);
     }
 
