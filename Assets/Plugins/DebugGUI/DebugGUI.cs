@@ -209,6 +209,8 @@ public partial class DebugGUI : MonoBehaviour
         Application.quitting += () => quitting = true;
         initialized = true;
         _settings = Resources.Load<DebugGUISettings>("DebugGUISettings");
+        if (!_settings)
+            _settings = ScriptableObject.CreateInstance<DebugGUISettings>();
         DontDestroyOnLoad(gameObject);
 
         graphWindow = new GameObject("Graph").AddComponent<GraphWindow>();
